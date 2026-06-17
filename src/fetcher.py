@@ -12,6 +12,7 @@ import time
 
 from config import BAOSTOCK_CONFIG, STOCK_CONFIG
 from src.logger import get_logger
+from src.storage import MongoStorage
 
 logger = get_logger("Fetcher")
 
@@ -19,17 +20,20 @@ logger = get_logger("Fetcher")
 class StockFetcher:
     """股票数据获取器"""
 
-    def __init__(self, use_cache: bool = True, cache_dir: Path = None):
+    def __init__(self, use_cache: bool = True, cache_dir: Path = None, use_db: bool = True):
         """
         初始化获取器
 
         Args:
             use_cache: 是否使用本地缓存
             cache_dir: 缓存目录
+            use_db: 是否使用数据库校验（避免重复拉取）
         """
         self.use_cache = use_cache if use_cache is not None else BAOSTOCK_CONFIG["use_cache"]
         self.cache_dir = cache_dir if cache_dir else BAOSTOCK_CONFIG["cache_dir"]
+        self.use_db = use_db
         self._logged_in = False
+        self._storage = None
 
     def _ensure_login(self):
         """确保已登录Baostock"""
@@ -80,6 +84,48 @@ class StockFetcher:
 
         return f"{prefix}.{stock_code}"
 
+    def _get_storage(self) -> MongoStorage:
+        """获取MongoDB存储实例（延迟初始化）"""
+        if self._storage is None:
+            self._storage = MongoStorage()
+            if not self._storage.connect():
+                logger.warning("MongoDB连接失败，将跳过数据库检查")
+                return None
+        return self._storage
+
+    def _check_db_exists(self, stock_code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
+        """
+        检查数据库中是否已有该股票指定区间的数据
+
+        Args:
+            stock_code: 股票代码
+            start_date: 开始日期
+            end_date: 结束日期
+
+        Returns:
+            如果数据存在则返回DataFrame，否则返回None
+        """
+        if not self.use_db:
+            return None
+
+        try:
+            storage = self._get_storage()
+            if storage is None:
+                return None
+
+            # 检查数据库中是否有该区间的数据
+            df = storage.load(stock_code, start_date, end_date)
+            if not df.empty:
+                # 检查数据日期范围是否覆盖请求的区间
+                db_min_date = df['date'].min()
+                db_max_date = df['date'].max()
+                logger.info(f"数据库已有: {stock_code} ({db_min_date.date()} ~ {db_max_date.date()})")
+                return df
+        except Exception as e:
+            logger.warning(f"数据库检查失败: {e}")
+
+        return None
+
     def fetch_daily(
         self,
         stock_code: str,
@@ -108,14 +154,19 @@ class StockFetcher:
         stock_code = self._normalize_stock_code(stock_code)
         cache_path = self._get_cache_path(stock_code, start_date, end_date)
 
-        # 检查缓存
+        # 1. 检查数据库是否有数据
+        df = self._check_db_exists(stock_code, start_date, end_date)
+        if df is not None:
+            return df
+
+        # 2. 检查本地缓存
         if self.use_cache and cache_path.exists():
             logger.info(f"从缓存加载: {stock_code} ({start_date} ~ {end_date})")
             df = pd.read_csv(cache_path)
             df['date'] = pd.to_datetime(df['date'])
             return df
 
-        # 获取数据
+        # 3. 从Baostock获取数据
         logger.info(f"从Baostock获取数据: {stock_code} ({start_date} ~ {end_date})")
         self._ensure_login()
 
@@ -235,6 +286,8 @@ class StockFetcher:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """上下文管理器出口"""
         self._logout()
+        if self._storage:
+            self._storage.disconnect()
         return False
 
 

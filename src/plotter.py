@@ -450,6 +450,116 @@ class StockPlotter:
 
         return fig
 
+    def save_integrated_html(
+        self,
+        df: pd.DataFrame,
+        stock_code: str,
+        output_dir: Path = None,
+        include_benchmark: bool = False,
+        benchmark_df: pd.DataFrame = None
+    ) -> str:
+        """
+        将所有图表集成到一张HTML页面
+
+        Args:
+            df: DataFrame
+            stock_code: 股票代码
+            output_dir: 输出目录
+            include_benchmark: 是否包含基准对比
+            benchmark_df: 基准数据
+
+        Returns:
+            str - HTML文件路径
+        """
+        if output_dir is None:
+            output_dir = Path(self.config['output_dir'])
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # 生成各个图表
+        charts = {}
+
+        # K线图
+        fig_kline = self.plot_candlestick(df, stock_code)
+        if fig_kline:
+            charts['K线图'] = fig_kline
+
+        # 回撤图
+        fig_dd = self.plot_drawdown(df, stock_code)
+        if fig_dd:
+            charts['回撤图'] = fig_dd
+
+        # 收益率图
+        fig_ret = self.plot_returns(df, stock_code, benchmark_df if include_benchmark else None)
+        if fig_ret:
+            charts['收益率'] = fig_ret
+
+        # 波动率图
+        if 'volatility_20d' in df.columns or 'volatility_60d' in df.columns:
+            fig_vol = self.plot_volatility(df, stock_code)
+            if fig_vol:
+                charts['波动率'] = fig_vol
+
+        # 生成集成HTML
+        html_parts = [
+            '<!DOCTYPE html>',
+            '<html>',
+            '<head>',
+            f'<title>{stock_code} 分析报告</title>',
+            '<meta charset="utf-8">',
+            '<style>',
+            'body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }',
+            '.chart-container { background: white; margin: 20px 0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }',
+            'h1 { color: #333; text-align: center; }',
+            'h2 { color: #666; border-bottom: 2px solid #1f77b4; padding-bottom: 10px; }',
+            '.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }',
+            '.stat-box { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }',
+            '.stat-label { color: #666; font-size: 14px; }',
+            '.stat-value { color: #333; font-size: 20px; font-weight: bold; }',
+            '</style>',
+            '</head>',
+            '<body>',
+            f'<h1>{stock_code} 技术分析报告</h1>',
+        ]
+
+        # 添加统计信息
+        html_parts.append('<div class="stats">')
+        if 'close' in df.columns and len(df) > 0:
+            start_price = df['close'].iloc[0]
+            end_price = df['close'].iloc[-1]
+            total_return = (end_price / start_price - 1) * 100
+            html_parts.append(f'<div class="stat-box"><div class="stat-label">区间涨跌幅</div><div class="stat-value">{total_return:.2f}%</div></div>')
+
+        if 'drawdown_pct' in df.columns:
+            max_dd = df['drawdown_pct'].min()
+            html_parts.append(f'<div class="stat-box"><div class="stat-label">最大回撤</div><div class="stat-value">{max_dd:.2f}%</div></div>')
+
+        if 'volatility_20d' in df.columns:
+            vol = df['volatility_20d'].iloc[-1] * 100
+            html_parts.append(f'<div class="stat-box"><div class="stat-label">20日波动率</div><div class="stat-value">{vol:.2f}%</div></div>')
+
+        html_parts.append('</div>')
+
+        # 添加各个图表
+        for title, fig in charts.items():
+            html_parts.append(f'<div class="chart-container">')
+            html_parts.append(f'<h2>{title}</h2>')
+            html_parts.append(fig.to_html(full_html=False, include_plotlyjs='cdn'))
+            html_parts.append('</div>')
+
+        html_parts.extend([
+            '</body>',
+            '</html>'
+        ])
+
+        # 保存文件
+        output_path = output_dir / f"{stock_code}_report.html"
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(html_parts))
+
+        logger.info(f"集成报告已保存: {output_path}")
+        return str(output_path)
+
     def save_all(
         self,
         df: pd.DataFrame,
@@ -477,36 +587,10 @@ class StockPlotter:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         paths = {}
-        prefix = f"{stock_code}_"
 
-        # K线图
-        fig = self.plot_candlestick(df, stock_code)
-        if fig:
-            path = output_dir / f"{prefix}candlestick.html"
-            fig.write_html(path)
-            paths['candlestick'] = str(path)
-
-        # 回撤图
-        fig = self.plot_drawdown(df, stock_code)
-        if fig:
-            path = output_dir / f"{prefix}drawdown.html"
-            fig.write_html(path)
-            paths['drawdown'] = str(path)
-
-        # 收益率图
-        fig = self.plot_returns(df, stock_code, benchmark_df if include_benchmark else None)
-        if fig:
-            path = output_dir / f"{prefix}returns.html"
-            fig.write_html(path)
-            paths['returns'] = str(path)
-
-        # 波动率图
-        if 'volatility_20d' in df.columns or 'volatility_60d' in df.columns:
-            fig = self.plot_volatility(df, stock_code)
-            if fig:
-                path = output_dir / f"{prefix}volatility.html"
-                fig.write_html(path)
-                paths['volatility'] = str(path)
+        # 生成集成HTML报告
+        integrated_path = self.save_integrated_html(df, stock_code, output_dir, include_benchmark, benchmark_df)
+        paths['integrated'] = integrated_path
 
         logger.info(f"所有图表已保存到: {output_dir}")
         return paths
