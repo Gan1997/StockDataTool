@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+"""
+项目依赖
+"""
+
+# 数据获取
+baostock>=0.8.8
+yfinance>=0.2.0
+
+# MongoDB
+pymongo>=4.6.0
+
+# 数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 绘图
+plotly>=5.18.0
+
+# 日志
+loguru>=0.7.0
+
+# 工具
+python-dateutil>=2.8.0
