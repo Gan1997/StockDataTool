@@ -93,9 +93,9 @@ PLOT_CONFIG = {
     "height": 600,
     "template": "plotly_white",
     "theme": {
-        "up_color": "#26A69A",    # 上涨颜色
-        "down_color": "#EF5350",  # 下跌颜色
-        "ma_colors": ["#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7"],
+        "up_color": "#c53030",    # 上涨颜色（深红色 - 金融风格）
+        "down_color": "#276749",  # 下跌颜色（深绿色 - 金融风格）
+        "ma_colors": ["#c53030", "#2c5282", "#64748b", "#94a3b8", "#cbd5e0"],
     },
     "output_dir": OUTPUT_DIR,
 }

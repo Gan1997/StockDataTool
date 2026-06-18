@@ -22,3 +22,6 @@ loguru>=0.7.0
 
 # 工具
 python-dateutil>=2.8.0
+
+# Web框架
+flask>=3.0.0

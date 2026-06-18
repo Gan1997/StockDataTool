@@ -237,12 +237,66 @@ class DataAnalyzer:
                         df_analyzed[ma_cols[0]].iloc[-1] > df_analyzed[ma_cols[1]].iloc[-1] > df_analyzed[ma_cols[2]].iloc[-1]
                     ):
                         passed = False
+                    else:
+                        stats['ma_golden_cross'] = True
+                else:
+                    passed = False
+                    stats['ma_golden_cross'] = False
+            else:
+                stats['ma_golden_cross'] = False
+
+            # 放量突破判断
+            if 'volume_breakout' in criteria and criteria['volume_breakout']:
+                volume_breakout, volume_ratio = self._check_volume_breakout(df_analyzed)
+                stats['volume_breakout'] = volume_breakout
+                stats['volume_ratio'] = volume_ratio
+                if not volume_breakout:
+                    passed = False
+            else:
+                stats['volume_breakout'] = False
+                stats['volume_ratio'] = None
 
             if passed:
                 results.append(stats)
 
         logger.info(f"筛选完成: {len(results)}/{len(data_dict)} 只股票符合条件")
         return results
+
+    def _check_volume_breakout(self, df: pd.DataFrame, lookback: int = 20) -> Tuple[bool, float]:
+        """
+        检查是否放量突破
+
+        放量突破条件：
+        1. 今日成交量 > 20日均量的1.5倍
+        2. 今日收盘价 > 20日最高价
+
+        Args:
+            df: DataFrame
+            lookback: 回溯天数
+
+        Returns:
+            (是否放量突破, 量比)
+        """
+        if df.empty or len(df) < lookback + 1:
+            return False, 0.0
+
+        # 获取最新数据和历史数据
+        latest = df.iloc[-1]
+        history = df.iloc[-lookback:]
+
+        # 计算20日均量
+        ma20_volume = history['volume'].mean()
+
+        # 计算20日最高价
+        ma20_high = history['high'].max()
+
+        # 计算量比
+        volume_ratio = latest['volume'] / ma20_volume if ma20_volume > 0 else 0
+
+        # 判断是否放量突破
+        volume_breakout = (volume_ratio > 1.5) and (latest['close'] > ma20_high)
+
+        return volume_breakout, volume_ratio
 
     def analyze_batch(
         self,

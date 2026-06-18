@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>股票分析看板</title>
+<meta charset="utf-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: #f5f7fa; min-height: 100vh; color: #333; }
+.header { background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%); padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.header h1 { font-size: 1rem; color: white; font-weight: 600; }
+.header-controls { display: flex; gap: 8px; align-items: center; }
+.date-input { padding: 5px 8px; border: 1px solid #ddd; border-radius: 4px; background: white; font-size: 12px; color: #333; }
+.btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 500; }
+.btn-primary { background: #2c5282; color: white; }
+.btn-primary:hover { background: #1e3a5f; }
+.btn-secondary { background: #e2e8f0; color: #4a5568; }
+.btn-secondary:hover { background: #cbd5e0; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px; background: white; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
+.toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 10px; align-items: center; }
+.filter-group { display: flex; gap: 5px; align-items: center; }
+.filter-label { font-size: 11px; color: #64748b; font-weight: 500; }
+.filter-input { padding: 4px 8px; border: 1px solid #cbd5e0; border-radius: 4px; background: white; color: #333; font-size: 12px; width: 55px; }
+.stat-card { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); padding: 6px 12px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; border: 1px solid #e2e8f0; }
+.stat-card .label { font-size: 10px; color: #64748b; font-weight: 500; }
+.stat-card .value { font-size: 0.95rem; font-weight: 700; color: #1e3a5f; }
+.stat-card .value.positive { color: #c53030; }
+.stat-card .value.negative { color: #276749; }
+.quick-selector { display: flex; gap: 5px; padding: 6px 20px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; align-items: center; }
+.quick-btn { background: #e2e8f0; color: #4a5568; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; border: 1px solid #cbd5e0; font-weight: 500; }
+.quick-btn:hover, .quick-btn.active { background: #2c5282; color: white; border-color: #2c5282; }
+.period-selector { display: flex; gap: 2px; }
+.period-btn { padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 4px; cursor: pointer; font-size: 12px; background: white; color: #64748b; }
+.period-btn:hover { background: #f1f5f9; }
+.period-btn.active { background: #2c5282; color: white; border-color: #2c5282; }
+.charts-container { display: flex; gap: 16px; padding: 16px 24px; height: calc(100vh - 130px); min-height: 700px; align-items: stretch; }
+.left-panel { flex: 0 0 65%; display: flex; flex-direction: column; }
+.left-panel .grid-cell { flex: 1; min-height: 0; }
+.right-panel { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.right-panel .grid-cell { flex: 1; min-height: 0; }
+.grid-cell { background: white; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; min-height: 180px; min-width: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; cursor: pointer; transition: box-shadow 0.2s; }
+.grid-cell:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.expand-hint { font-size: 10px; color: #94a3b8; opacity: 0; transition: opacity 0.2s; }
+.grid-cell:hover .expand-hint { opacity: 1; }
+.cell-header { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; background: #f8fafc; height: 40px; }
+.cell-title { font-weight: 600; font-size: 12px; color: #1e3a5f; }
+.cell-subtitle { font-size: 10px; color: #64748b; }
+.cell-body { flex: 1; min-height: 0; min-width: 0; position: relative; }
+.cell-body > div { width: 100% !important; height: 100% !important; }
+.quick-btn { background: rgba(102, 126, 234, 0.2); color: #667eea; padding: 4px 10px; border-radius: 6px; font-size: 12px; cursor: pointer; border: none; }
+.quick-btn:hover { background: #667eea; color: white; }
+.rank-table { width: 100%; border-collapse: collapse; }
+.rank-table th, .rank-table td { padding: 10px 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.rank-table th { background: rgba(255,255,255,0.05); color: #888; font-weight: 500; font-size: 13px; }
+.rank-table tr:hover { background: rgba(255,255,255,0.03); }
+.rank-table .rank { width: 40px; text-align: center; }
+.rank-table .code { font-weight: 600; color: #667eea; }
+.rank-table .positive { color: #EF5350; }
+.rank-table .negative { color: #26A69A; }
+.all-charts { display: none; }
+.chart-modal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #ffffff; z-index: 10000; }
+.chart-modal.active { display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.modal-title { color: #1e3a5f; font-size: 16px; font-weight: 600; }
+.modal-close { background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; width: 36px; height: 36px; border-radius: 50%; font-size: 20px; cursor: pointer; }
+.modal-close:hover { background: rgba(239, 68, 68, 0.2); }
+.modal-body { flex: 1; padding: 0; overflow: hidden; }
+.modal-chart { width: 100%; height: 100%; }
+.modal-chart .js-plotly-plot, .modal-chart > div { width: 100% !important; height: 100% !important; }
+</style>
+</head>
+<body>
+
+        <div class="header">
+            <h1>📈 股票分析看板</h1>
+            <div class="header-controls">
+                <input type="date" class="date-input" id="startDate" value="1969-07-01" onchange="filterByDate()">
+                <input type="date" class="date-input" id="endDate" value="1970-01-01" onchange="filterByDate()">
+                <button class="btn btn-primary" onclick="showRanking()">📋榜单</button>
+                <button class="btn btn-secondary" onclick="showCharts()">📊图表</button>
+                <div class="period-selector">
+                    <button class="period-btn active" onclick="switchPeriod('d')">日线</button>
+                    <button class="period-btn" onclick="switchPeriod('w')">周线</button>
+                    <button class="period-btn" onclick="switchPeriod('m')">月线</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="stat-card">
+                    <div class="label">股票</div>
+                    <div class="value" id="statCode">600519</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">涨跌</div>
+                    <div class="value positive" id="statReturn">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">回撤</div>
+                    <div class="value negative" id="statDrawdown">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">量比</div>
+                    <div class="value" id="statVolume">-</div>
+                </div>
+            </div>
+            <div class="toolbar-right">
+                <div class="filter-group">
+                    <span class="filter-label">收益></span>
+                    <input type="number" class="filter-input" id="filterReturn" value="0" step="1">
+                    <span class="filter-label">%</span>
+                </div>
+                <div class="filter-group">
+                    <span class="filter-label">回撤<</span>
+                    <input type="number" class="filter-input" id="filterDrawdown" value="20" step="1">
+                    <span class="filter-label">%</span>
+                </div>
+                <div class="filter-group">
+                    <input type="checkbox" id="filterMA">
+                    <span class="filter-label">均线多头</span>
+                </div>
+                <div class="filter-group">
+                    <input type="checkbox" id="filterVolume">
+                    <span class="filter-label">放量突破</span>
+                </div>
+                <button class="btn btn-primary" onclick="applyFilter()">筛选</button>
+                <span id="filterCount" style="color:#888;font-size:10px;"></span>
+            </div>
+        </div>
+
+        <div class="quick-selector" id="quickSelector">
+            <span class="quick-btn active" onclick="quickSwitch('600519')">贵州茅台</span><span class="quick-btn active" onclick="quickSwitch('000858')">五粮液</span><span class="quick-btn active" onclick="quickSwitch('000333')">美的集团</span><span class="quick-btn active" onclick="quickSwitch('600036')">招商银行</span><span class="quick-btn active" onclick="quickSwitch('601318')">中国平安</span><span class="quick-btn active" onclick="quickSwitch('000001')">平安银行</span><span class="quick-btn active" onclick="quickSwitch('600887')">伊利股份</span><span class="quick-btn active" onclick="quickSwitch('000568')">泸州老窖</span>
+        </div>
+
+        <!-- 左一右三图表视图 -->
+        <div class="charts-container" id="chartsView">
+            <!-- 左侧大图：均线 -->
+            <div class="left-panel">
+                <div class="grid-cell" onclick="expandChart('chart1')">
+                    <div class="cell-header">
+                        <span class="cell-title">K线+均线+成交量</span>
+                        <span class="expand-hint">↗ 点击展开</span>
+                    </div>
+                    <div class="cell-body" id="chart1"></div>
+                </div>
+            </div>
+            <!-- 右侧三个小图 -->
+            <div class="right-panel">
+                <div class="grid-cell" onclick="expandChart('chart2')">
+                    <div class="cell-header">
+                        <span class="cell-title">净值</span>
+                        <span class="expand-hint">↗ 点击展开</span>
+                    </div>
+                    <div class="cell-body" id="chart2"></div>
+                </div>
+                <div class="grid-cell" onclick="expandChart('chart3')">
+                    <div class="cell-header">
+                        <span class="cell-title">回撤分析</span>
+                        <span class="expand-hint">↗ 点击展开</span>
+                    </div>
+                    <div class="cell-body" id="chart3"></div>
+                </div>
+                <div class="grid-cell" onclick="expandChart('chart4')">
+                    <div class="cell-header">
+                        <span class="cell-title">波动率</span>
+                        <span class="expand-hint">↗ 点击展开</span>
+                    </div>
+                    <div class="cell-body" id="chart4"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 榜单视图 -->
+        <div id="rankingView" style="display:none; padding: 15px 25px;">
+            <table class="rank-table">
+                <thead>
+                    <tr>
+                        <th class="rank">#</th>
+                        <th>股票代码</th>
+                        <th>股票名称</th>
+                        <th>区间收益</th>
+                        <th>年化收益</th>
+                        <th>最大回撤</th>
+                        <th>量比</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="rankBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 图表全屏模态框 -->
+        <div class="chart-modal" id="chartModal">
+            <div class="modal-header">
+                <span class="modal-title" id="modalTitle">图表详情</span>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-chart" id="modalChart"></div>
+            </div>
+        </div>
+
+        <!-- 隐藏的图表容器 -->
+        <div class="all-charts" id="allChartsContainer">
+
+<div class="chart-wrapper hidden" data-stock="600519" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="600519" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="600519" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="600519" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="000858" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="000858" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="000858" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="000858" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="000333" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="000333" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="000333" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="000333" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="600036" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="600036" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="600036" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="600036" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="601318" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="601318" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="601318" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="601318" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="000001" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="000001" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="000001" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="000001" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="600887" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="600887" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="600887" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="600887" data-type="volatility"></div>
+<div class="chart-wrapper hidden" data-stock="000568" data-type="ma"></div>
+<div class="chart-wrapper hidden" data-stock="000568" data-type="drawdown"></div>
+<div class="chart-wrapper hidden" data-stock="000568" data-type="returns"></div>
+<div class="chart-wrapper hidden" data-stock="000568" data-type="volatility"></div>
+</div>
+
+        <script src="https://cdn.plot.ly/plotly-2.29.1.min.js"></script>
+        <script>
+        let stockData = {};
+        let allCodes = [];
+        let currentStock = null;
+        let currentView = 'charts';
+        let filteredCodes = [];
+        let dataLoaded = false;
+        let currentPeriod = 'd';
+
+        function switchPeriod(period) {
+            currentPeriod = period;
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === (period === 'd' ? '日线' : period === 'w' ? '周线' : '月线'));
+            });
+            updateDisplay();
+        }
+
+        function showLoading(msg) {
+            let loadingDiv = document.getElementById('loading-indicator');
+            if (!loadingDiv) {
+                loadingDiv = document.createElement('div');
+                loadingDiv.id = 'loading-indicator';
+                loadingDiv.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:30px 50px;background:rgba(0,0,0,0.8);color:white;border-radius:8px;font-size:16px;z-index:9999;';
+                document.body.appendChild(loadingDiv);
+            }
+            loadingDiv.textContent = msg;
+        }
+        function hideLoading() {
+            const loadingDiv = document.getElementById('loading-indicator');
+            if (loadingDiv) loadingDiv.remove();
+        }
+
+        function loadStockData() {
+            showLoading('正在加载数据...');
+            console.log('Starting to load stock_data.json...');
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            return fetch('stock_data.json', { cache: 'no-cache', signal: controller.signal })
+                .then(response => {
+                    clearTimeout(timeoutId);
+                    console.log('Response status:', response.status, response.statusText);
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('JSON parsed successfully, keys:', Object.keys(data));
+                    stockData = data;
+                    allCodes = Object.keys(stockData);
+                    filteredCodes = allCodes;
+                    if (allCodes.length > 0) {
+                        currentStock = allCodes[0];
+                    }
+                    dataLoaded = true;
+                    console.log('Data loaded, currentStock:', currentStock);
+                    hideLoading();
+                    initDisplay();
+                })
+                .catch(error => {
+                    clearTimeout(timeoutId);
+                    console.error('Error loading stock data:', error);
+                    hideLoading();
+                    const errorDiv = document.createElement('div');
+                    errorDiv.style.cssText = 'padding:50px;text-align:center;font-size:20px;color:red;';
+                    errorDiv.innerHTML = '数据加载失败: ' + error.message + '<br>请刷新页面重试<br><small>如果问题持续，请检查网络连接</small>';
+                    document.body.appendChild(errorDiv);
+                });
+        }
+
+        function initDisplay() {
+            updateDisplay();
+            setupDateInputs();
+        }
+
+        function subtractMonths(dateStr, months) {
+            const date = new Date(dateStr);
+            const year = date.getFullYear();
+            const month = date.getMonth();
+            const day = date.getDate();
+            let newYear = year;
+            let newMonth = month - months;
+            while (newMonth < 0) {
+                newYear -= 1;
+                newMonth += 12;
+            }
+            const lastDayOfNewMonth = new Date(newYear, newMonth + 1, 0).getDate();
+            const newDay = Math.min(day, lastDayOfNewMonth);
+            return new Date(newYear, newMonth, newDay).toISOString().split('T')[0];
+        }
+
+        function setupDateInputs() {
+            const data = stockData[currentStock];
+            const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
+            const rawData = data['raw' + periodKey];
+            if (!rawData || !rawData.dates || rawData.dates.length === 0) return;
+
+            const dates = rawData.dates;
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+
+            if (dates.length > 0) {
+                const latestDate = dates[dates.length - 1];
+                const sixMonthsAgoStr = subtractMonths(latestDate, 6);
+
+                startDateInput.value = sixMonthsAgoStr;
+                endDateInput.value = latestDate;
+                startDateInput.max = latestDate;
+                endDateInput.min = dates[0];
+                endDateInput.max = latestDate;
+            }
+        }
+
+        function getFilteredIndices(code) {
+            const data = stockData[code];
+            const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
+            const rawData = data['raw' + periodKey];
+            if (!rawData) return {indices: [], startIdx: 0, endIdx: 0};
+
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const dates = rawData.dates;
+            
+            let startIdx = 0;
+            let endIdx = dates.length - 1;
+            
+            for (let i = 0; i < dates.length; i++) {
+                if (dates[i] >= startDate) {
+                    startIdx = i;
+                    break;
+                }
+            }
+            for (let i = dates.length - 1; i >= 0; i--) {
+                if (dates[i] <= endDate) {
+                    endIdx = i;
+                    break;
+                }
+            }
+            
+            return {startIdx, endIdx, indices: Array.from({length: endIdx - startIdx + 1}, (_, i) => startIdx + i)};
+        }
+
+        function calculateStats(code) {
+            const data = stockData[code];
+            const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
+            const rawData = data['raw' + periodKey];
+            if (!rawData) return {return: 0, max_drawdown: 0, volume_ratio: 0, ma_golden_cross: false, volume_breakout: false};
+
+            const {startIdx, endIdx} = getFilteredIndices(code);
+            const close = rawData.close;
+            const volume = rawData.volume;
+            const ma20 = rawData.ma20;
+            const ma60 = rawData.ma60;
+            const drawdown_pct = rawData.drawdown_pct;
+            const high = rawData.high;
+
+            if (endIdx < startIdx || startIdx >= close.length || endIdx >= close.length) {
+                return {return: 0, max_drawdown: 0, volume_ratio: 0, ma_golden_cross: false, volume_breakout: false};
+            }
+
+            const startPrice = close[startIdx];
+            const endPrice = close[endIdx];
+            const total_return = startPrice > 0 ? ((endPrice / startPrice - 1) * 100) : 0;
+
+            let max_dd = 0;
+            for (let i = startIdx; i <= endIdx; i++) {
+                if (drawdown_pct[i] !== undefined && drawdown_pct[i] < max_dd) {
+                    max_dd = drawdown_pct[i];
+                }
+            }
+
+            let volume_ratio = 0;
+            const volEndIdx = Math.max(startIdx, endIdx - 20);
+            if (volEndIdx <= endIdx) {
+                let sumVol = 0;
+                let count = 0;
+                for (let i = volEndIdx; i < endIdx; i++) {
+                    if (volume[i] !== undefined) {
+                        sumVol += volume[i];
+                        count++;
+                    }
+                }
+                const avgVol = count > 0 ? sumVol / count : 0;
+                if (avgVol > 0 && volume[endIdx] !== undefined) {
+                    volume_ratio = volume[endIdx] / avgVol;
+                }
+            }
+
+            const ma_golden_cross = ma20 && ma60 && ma20[endIdx] !== undefined && ma60[endIdx] !== undefined &&
+                                    ma20[endIdx] > ma60[endIdx];
+            
+            let volume_breakout = false;
+            if (volEndIdx <= endIdx && high.length > endIdx && volume[endIdx] !== undefined && close[endIdx] !== undefined) {
+                let maxHigh = -Infinity;
+                for (let i = volEndIdx; i < endIdx; i++) {
+                    if (high[i] !== undefined && high[i] > maxHigh) {
+                        maxHigh = high[i];
+                    }
+                }
+                let sumVol20 = 0;
+                let count20 = 0;
+                for (let i = volEndIdx; i < endIdx; i++) {
+                    if (volume[i] !== undefined) {
+                        sumVol20 += volume[i];
+                        count20++;
+                    }
+                }
+                const avgVol20 = count20 > 0 ? sumVol20 / count20 : 0;
+                const volRatio20 = avgVol20 > 0 ? volume[endIdx] / avgVol20 : 0;
+                volume_breakout = volRatio20 > 1.5 && close[endIdx] > maxHigh;
+            }
+            
+            return {return: total_return, max_drawdown: max_dd, volume_ratio: volume_ratio, ma_golden_cross, volume_breakout};
+        }
+
+        function quickSwitch(code) {
+            currentStock = code;
+            document.querySelectorAll('.quick-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === code);
+            });
+            updateDisplay();
+        }
+
+        function filterByDate() {
+            updateDisplay();
+        }
+
+        function applyFilter() {
+            filteredCodes = allCodes;
+            
+            const minReturn = parseFloat(document.getElementById('filterReturn').value) || 0;
+            const maxDrawdown = parseFloat(document.getElementById('filterDrawdown').value) || 100;
+            const checkMA = document.getElementById('filterMA').checked;
+            const checkVolume = document.getElementById('filterVolume').checked;
+
+            filteredCodes = filteredCodes.filter(code => {
+                const stats = calculateStats(code);
+                if (stats.return < minReturn) return false;
+                if (stats.max_drawdown > maxDrawdown) return false;
+                if (checkMA && !stats.ma_golden_cross) return false;
+                if (checkVolume && !stats.volume_breakout) return false;
+                return true;
+            });
+
+            document.getElementById('filterCount').textContent = '筛选: ' + filteredCodes.length + '/' + allCodes.length;
+
+            const selector = document.getElementById('quickSelector');
+            if (filteredCodes.length === 0) {
+                selector.innerHTML = '<span style="color:#888;font-size:10px;">无符合条件</span>';
+            } else {
+                selector.innerHTML = filteredCodes.slice(0, 8).map(c =>
+                    '<span class="quick-btn' + (c === currentStock ? ' active' : '') + '" onclick="quickSwitch(\'' + c + '\')">' + (stockData[c] && stockData[c].name ? stockData[c].name : c) + '</span>'
+                ).join('');
+            }
+
+            if (filteredCodes.length > 0 && !filteredCodes.includes(currentStock)) {
+                quickSwitch(filteredCodes[0]);
+            } else if (filteredCodes.length === 0) {
+                updateDisplay();
+            }
+            renderRanking();
+        }
+
+        function updateDisplay() {
+            const data = stockData[currentStock];
+            console.log('updateDisplay called, currentStock:', currentStock, 'data:', data);
+            if (!data) {
+                console.log('No data for currentStock');
+                return;
+            }
+
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const stats = calculateStats(currentStock);
+
+            document.getElementById('statCode').textContent = currentStock;
+            const returnSign = stats.return >= 0 ? '+' : '';
+            const returnEl = document.getElementById('statReturn');
+            returnEl.textContent = returnSign + stats.return.toFixed(2) + '%';
+            returnEl.className = 'value ' + (stats.return >= 0 ? 'positive' : 'negative');
+            document.getElementById('statDrawdown').textContent = stats.max_drawdown.toFixed(2) + '%';
+            document.getElementById('statVolume').textContent = stats.volume_ratio.toFixed(2);
+
+            // 使用 requestAnimationFrame 确保容器尺寸正确
+            requestAnimationFrame(() => {
+                renderCharts(data, startDate, endDate);
+            });
+        }
+
+        function renderCharts(data, startDate, endDate) {
+            try {
+                const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
+                ['chart1', 'chart2', 'chart3', 'chart4'].forEach(id => {
+                    const keyMap = {'chart1': 'ma', 'chart2': 'returns', 'chart3': 'drawdown', 'chart4': 'volatility'};
+                    const key = keyMap[id] + periodKey;
+                    console.log('Rendering chart', id, 'with key', key, 'data[key]:', data[key]);
+                    const container = document.getElementById(id);
+                    if (data[key]) {
+                        const fig = data[key];
+                        console.log('fig.data:', fig.data, 'fig.layout:', fig.layout);
+
+                        // 获取容器实际尺寸
+                        const containerRect = container.getBoundingClientRect();
+                        let containerWidth = containerRect.width;
+                        let containerHeight = containerRect.height;
+
+                        // 如果容器尺寸为0，使用默认值
+                        if (containerWidth === 0) containerWidth = id === 'chart1' ? 700 : 400;
+                        if (containerHeight === 0) containerHeight = id === 'chart1' ? 500 : 200;
+
+                        const layout = {
+                            ...fig.layout,
+                            autosize: false,
+                            width: containerWidth,
+                            height: containerHeight,
+                            margin: {l: 50, r: 20, t: 20, b: 40}
+                        };
+                        if (layout.xaxis) {
+                            layout.xaxis.range = [startDate, endDate];
+                        }
+                        container.innerHTML = '<div id="' + id + '-plot"></div>';
+                        Plotly.newPlot(id + '-plot', fig.data, layout, {responsive: false, displayModeBar: false});
+                        console.log('Chart', id, 'rendered successfully with size', containerWidth, 'x', containerHeight);
+                    } else {
+                        container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">暂无数据</div>';
+                        console.log('No data for chart', id);
+                    }
+                });
+            } catch (e) {
+                console.error('Error rendering charts:', e);
+            }
+        }
+
+        function showCharts() {
+            currentView = 'charts';
+            document.getElementById('chartsView').style.display = 'flex';
+            document.getElementById('rankingView').style.display = 'none';
+            document.querySelector('.btn-secondary').textContent = '📊 图表';
+        }
+
+        function showRanking() {
+            currentView = 'ranking';
+            document.getElementById('chartsView').style.display = 'none';
+            document.getElementById('rankingView').style.display = 'block';
+            document.querySelector('.btn-secondary').textContent = '📈 图表';
+            renderRanking();
+        }
+
+        function expandChart(chartId) {
+            const chartTypeMap = {
+                'chart1': 'ma',
+                'chart2': 'returns',
+                'chart3': 'drawdown',
+                'chart4': 'volatility'
+            };
+            const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
+            const type = chartTypeMap[chartId] + periodKey;
+            const titleMap = {
+                'chart1': 'K线+均线+成交量',
+                'chart2': '净值',
+                'chart3': '回撤分析',
+                'chart4': '波动率'
+            };
+            const periodLabel = currentPeriod === 'd' ? '日线' : currentPeriod === 'w' ? '周线' : '月线';
+            const data = stockData[currentStock];
+            if (data && data[type]) {
+                document.getElementById('modalTitle').textContent = `${currentStock} - ${titleMap[chartId]} (${periodLabel})`;
+                const modalChart = document.getElementById('modalChart');
+                modalChart.innerHTML = '<div id="modal-plot"></div>';
+                
+                document.getElementById('chartModal').classList.add('active');
+                
+                requestAnimationFrame(() => {
+                    const rect = modalChart.getBoundingClientRect();
+                    const layout = {
+                        ...data[type].layout,
+                        autosize: false,
+                        width: rect.width,
+                        height: rect.height,
+                        margin: {l: 60, r: 20, t: 30, b: 40}
+                    };
+                    Plotly.newPlot('modal-plot', data[type].data, layout, {responsive: false});
+                });
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('chartModal').classList.remove('active');
+            document.getElementById('modalChart').innerHTML = '';
+        }
+
+        function renderRanking() {
+            const tbody = document.getElementById('rankBody');
+            const sorted = filteredCodes.map(code => [code, calculateStats(code)]).sort((a, b) => b[1].return - a[1].return);
+            tbody.innerHTML = sorted.map(([code, stats], i) => {
+                const rank = i + 1;
+                const returnClass = stats.return >= 0 ? 'positive' : 'negative';
+                const returnSign = stats.return >= 0 ? '+' : '';
+                const annualized = (stats.return * 252 / stockData[code].days).toFixed(2);
+                const stockName = stockData[code] && stockData[code].name ? stockData[code].name : code;
+                return '<tr>' +
+                    '<td>' + rank + '</td>' +
+                    '<td class="code">' + code + '</td>' +
+                    '<td>' + stockName + '</td>' +
+                    '<td class="' + returnClass + '">' + returnSign + stats.return.toFixed(2) + '%</td>' +
+                    '<td>' + annualized + '%</td>' +
+                    '<td>' + stats.max_drawdown.toFixed(2) + '%</td>' +
+                    '<td>' + stats.volume_ratio.toFixed(2) + '</td>' +
+                    '<td><button class="quick-btn" onclick="quickSwitch(\'' + code + '\'); showCharts();">查看</button></td>' +
+                '</tr>';
+            }).join('');
+        }
+
+        renderRanking();
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStockData();
+        });
+        </script>
+        
+</body>
+</html>

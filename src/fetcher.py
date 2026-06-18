@@ -131,16 +131,18 @@ class StockFetcher:
         stock_code: str,
         start_date: str = None,
         end_date: str = None,
-        adjust: str = "3"
+        adjust: str = "3",
+        frequency: str = "d"
     ) -> pd.DataFrame:
         """
-        获取日K线数据
+        获取K线数据（支持日线/周线/月线）
 
         Args:
             stock_code: 股票代码，如 600519
             start_date: 开始日期，格式 YYYY-MM-DD
             end_date: 结束日期，格式 YYYY-MM-DD
             adjust: 复权类型，3=后复权(默认)，2=前复权，0=不复权
+            frequency: 频率，"d"=日线(默认)，"w"=周线，"m"=月线
 
         Returns:
             DataFrame，包含 date, code, open, high, low, close, volume
@@ -175,7 +177,7 @@ class StockFetcher:
             "date,code,open,high,low,close,volume",
             start_date=start_date,
             end_date=end_date,
-            frequency="d",
+            frequency=frequency,
             adjustflag=adjust
         )
 
@@ -210,7 +212,8 @@ class StockFetcher:
         self,
         stock_codes: List[str] = None,
         start_date: str = None,
-        end_date: str = None
+        end_date: str = None,
+        frequency: str = "d"
     ) -> Dict[str, pd.DataFrame]:
         """
         批量获取多只股票数据
@@ -219,6 +222,7 @@ class StockFetcher:
             stock_codes: 股票代码列表
             start_date: 开始日期
             end_date: 结束日期
+            frequency: 频率，"d"=日线(默认)，"w"=周线，"m"=月线
 
         Returns:
             Dict[stock_code, DataFrame]
@@ -237,7 +241,7 @@ class StockFetcher:
         for i, code in enumerate(stock_codes, 1):
             try:
                 logger.info(f"[{i}/{len(stock_codes)}] 正在获取: {code}")
-                df = self.fetch_daily(code, start_date, end_date)
+                df = self.fetch_daily(code, start_date, end_date, frequency=frequency)
                 results[code] = df
             except Exception as e:
                 logger.error(f"获取 {code} 失败: {e}")

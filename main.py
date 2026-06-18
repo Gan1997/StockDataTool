@@ -45,7 +45,8 @@ class StockPipeline:
         start_date: str = None,
         end_date: str = None,
         save_to_db: bool = True,
-        generate_plots: bool = True
+        generate_plots: bool = True,
+        period: str = "d"
     ) -> Dict:
         """
         运行单只股票的完整流水线
@@ -78,7 +79,7 @@ class StockPipeline:
         if config.RUN_MODE["fetch"]:
             try:
                 logger.info("[1/6] 获取数据...")
-                df = self.fetcher.fetch_daily(stock_code, start_date, end_date)
+                df = self.fetcher.fetch_daily(stock_code, start_date, end_date, frequency=period)
                 result["stages"]["fetch"] = {"status": "success", "rows": len(df)}
                 logger.info(f"获取完成: {len(df)} 条数据")
             except Exception as e:
@@ -148,20 +149,8 @@ class StockPipeline:
                 logger.error(f"存储数据库失败: {e}")
                 result["stages"]["store"] = {"status": "failed", "error": str(e)}
 
-        # Stage 6: 生成图表
-        if config.RUN_MODE["plot"] and generate_plots:
-            try:
-                logger.info("[6/6] 生成图表...")
-                output_dir = Path(config.PLOT_CONFIG["output_dir"])
-                paths = self.plotter.save_all(df_analyzed, stock_code, output_dir)
-                result["stages"]["plot"] = {
-                    "status": "success",
-                    "paths": paths
-                }
-                logger.info(f"图表生成完成")
-            except Exception as e:
-                logger.error(f"生成图表失败: {e}")
-                result["stages"]["plot"] = {"status": "failed", "error": str(e)}
+        # Stage 6: 生成图表（批量模式在run_batch中统一生成）
+        # 单股模式不单独生成HTML，只返回数据
 
         logger.info(f"=" * 50)
         logger.info(f"流水线完成: {stock_code}")
@@ -175,7 +164,8 @@ class StockPipeline:
         start_date: str = None,
         end_date: str = None,
         save_to_db: bool = True,
-        generate_plots: bool = True
+        generate_plots: bool = True,
+        period: str = "d"
     ) -> Dict[str, Dict]:
         """
         批量处理多只股票
@@ -205,11 +195,36 @@ class StockPipeline:
                 results[code] = self.run_single(
                     code, start_date, end_date,
                     save_to_db=save_to_db,
-                    generate_plots=generate_plots
+                    generate_plots=False,
+                    period=period
                 )
             except Exception as e:
                 logger.error(f"处理 {code} 失败: {e}")
                 results[code] = {"status": "failed", "error": str(e)}
+
+        # 生成批量集成报告
+        if generate_plots:
+            try:
+                logger.info("\n生成批量集成报告...")
+                output_dir = Path(config.PLOT_CONFIG["output_dir"])
+
+                # 获取成功处理的股票数据
+                data_dict = {}
+                for code, res in results.items():
+                    if res.get("status") == "success":
+                        try:
+                            df = self.fetcher.fetch_daily(code, start_date, end_date, frequency=period)
+                            df_clean = self.cleaner.clean(df)
+                            df_analyzed = self.analyzer.analyze(df_clean, code)
+                            data_dict[code] = df_analyzed
+                        except Exception as e:
+                            logger.warning(f"获取 {code} 数据失败: {e}")
+
+                if data_dict:
+                    batch_report_path = self.plotter.save_batch_report(data_dict, output_dir)
+                    logger.info(f"批量集成报告已保存: {batch_report_path}")
+            except Exception as e:
+                logger.error(f"生成批量报告失败: {e}")
 
         # 汇总结果
         success_count = sum(1 for r in results.values() if r.get("status") == "success")
@@ -220,9 +235,10 @@ class StockPipeline:
     def run_screen(
         self,
         stock_codes: List[str] = None,
-        criteria: Dict = None,
         start_date: str = None,
-        end_date: str = None
+        end_date: str = None,
+        criteria: Dict = None,
+        period: str = "d"
     ) -> List[Dict]:
         """
         选股筛选
@@ -252,7 +268,7 @@ class StockPipeline:
 
         # 批量获取
         logger.info("获取数据...")
-        data_dict = self.fetcher.fetch_batch(stock_codes, start_date, end_date)
+        data_dict = self.fetcher.fetch_batch(stock_codes, start_date, end_date, frequency=period)
 
         # 批量清洗
         logger.info("清洗数据...")
@@ -272,6 +288,29 @@ class StockPipeline:
             logger.info(f"  {r['stock_code']}: "
                        f"年化收益={r.get('annualized_return', 'N/A')}, "
                        f"最大回撤={r.get('max_drawdown', 'N/A')}")
+
+        # 生成筛选结果的4宫格报告
+        if results:
+            try:
+                logger.info("\n生成筛选结果分析报告...")
+                screened_codes = [r['stock_code'] for r in results]
+                data_dict = {}
+
+                for code in screened_codes:
+                    try:
+                        df = self.fetcher.fetch_daily(code, start_date, end_date)
+                        df_clean = self.cleaner.clean(df)
+                        df_analyzed = self.analyzer.analyze(df_clean, code)
+                        data_dict[code] = df_analyzed
+                    except Exception as e:
+                        logger.warning(f"获取 {code} 数据失败: {e}")
+
+                if data_dict:
+                    output_dir = Path(config.PLOT_CONFIG["output_dir"])
+                    batch_report_path = self.plotter.save_batch_report(data_dict, output_dir)
+                    logger.info(f"筛选报告已保存: {batch_report_path}")
+            except Exception as e:
+                logger.error(f"生成筛选报告失败: {e}")
 
         return results
 
@@ -336,6 +375,14 @@ def parse_args():
         help="结束日期，如 2024-12-31"
     )
 
+    parser.add_argument(
+        "--period", "-p",
+        type=str,
+        choices=["d", "w", "m"],
+        default="d",
+        help="数据周期: d=日线(默认), w=周线, m=月线"
+    )
+
     return parser.parse_args()
 
 
@@ -350,7 +397,8 @@ def main():
         results = pipeline.run_screen(
             stock_codes=[args.stock] if args.stock else None,
             start_date=args.start,
-            end_date=args.end
+            end_date=args.end,
+            period=args.period
         )
         # 绘制选股结果
         if results:
@@ -364,7 +412,8 @@ def main():
             save_to_db=not args.no_db,
             generate_plots=not args.no_plot,
             start_date=args.start,
-            end_date=args.end
+            end_date=args.end,
+            period=args.period
         )
 
     else:
@@ -374,7 +423,8 @@ def main():
             save_to_db=not args.no_db,
             generate_plots=not args.no_plot,
             start_date=args.start,
-            end_date=args.end
+            end_date=args.end,
+            period=args.period
         )
 
 
