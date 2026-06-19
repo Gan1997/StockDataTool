@@ -67,6 +67,33 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
 .modal-body { flex: 1; padding: 0; overflow: hidden; }
 .modal-chart { width: 100%; height: 100%; }
 .modal-chart .js-plotly-plot, .modal-chart > div { width: 100% !important; height: 100% !important; }
+.strategy-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.strategy-badge.momentum { background: #e3f2fd; color: #1565c0; }
+.strategy-badge.reversal { background: #ffebee; color: #c62828; }
+.strategy-badge.turtle { background: #e8f5e9; color: #2e7d32; }
+.strategy-badge.neutral { background: #f5f5f5; color: #757575; }
+.strategy-section { display: none; padding: 16px 24px; background: #f5f7fa; }
+.strategy-section.active { display: block; }
+.strategy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.strategy-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+.strategy-card h4 { font-size: 12px; color: #1e3a5f; margin-bottom: 8px; font-weight: 600; }
+.strategy-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.strategy-stat { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px dotted #e2e8f0; }
+.strategy-stat .label { color: #64748b; }
+.strategy-stat .value { font-weight: 600; color: #1e3a5f; }
+.strategy-stat .value.positive { color: #c62828; }
+.strategy-stat .value.negative { color: #2e7d32; }
+.strategy-chart-container { height: 320px; margin-top: 12px; background: white; border-radius: 8px; border: 1px solid #e2e8f0; }
+.strategy-selector { display: flex; gap: 16px; padding: 10px 12px; background: white; border-radius: 6px; border: 1px solid #e2e8f0; margin-bottom: 8px; flex-wrap: wrap; }
+.selector-group { display: flex; align-items: center; gap: 8px; }
+.selector-label { font-size: 11px; color: #1e3a5f; font-weight: 600; }
+.strategy-checkbox { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #64748b; cursor: pointer; }
+.strategy-checkbox input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: #2c5282; }
+.strategy-checkbox:hover { color: #2c5282; }
+.tab-bar { display: flex; gap: 2px; padding: 0 24px; background: white; border-bottom: 1px solid #e2e8f0; }
+.tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 12px; color: #64748b; font-weight: 500; border-bottom: 2px solid transparent; }
+.tab-btn:hover { color: #2c5282; }
+.tab-btn.active { color: #2c5282; border-bottom-color: #2c5282; }
 </style>
 </head>
 <body>
@@ -104,6 +131,10 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                     <div class="label">量比</div>
                     <div class="value" id="statVolume">-</div>
                 </div>
+                <div class="stat-card">
+                    <div class="label">策略适配</div>
+                    <div class="value" id="statStrategy">-</div>
+                </div>
             </div>
             <div class="toolbar-right">
                 <div class="filter-group">
@@ -125,12 +156,13 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                     <span class="filter-label">放量突破</span>
                 </div>
                 <button class="btn btn-primary" onclick="applyFilter()">筛选</button>
+                <button class="btn btn-secondary" onclick="resetFilter()">重置</button>
                 <span id="filterCount" style="color:#888;font-size:10px;"></span>
             </div>
         </div>
 
         <div class="quick-selector" id="quickSelector">
-            <span class="quick-btn active" onclick="quickSwitch('600519')">贵州茅台</span><span class="quick-btn active" onclick="quickSwitch('000858')">五粮液</span><span class="quick-btn active" onclick="quickSwitch('000333')">美的集团</span><span class="quick-btn active" onclick="quickSwitch('600036')">招商银行</span><span class="quick-btn active" onclick="quickSwitch('601318')">中国平安</span><span class="quick-btn active" onclick="quickSwitch('000001')">平安银行</span><span class="quick-btn active" onclick="quickSwitch('600887')">伊利股份</span><span class="quick-btn active" onclick="quickSwitch('000568')">泸州老窖</span>
+            <span class="quick-btn active" data-code="600519" onclick="quickSwitch('600519')">贵州茅台</span><span class="quick-btn active" data-code="000858" onclick="quickSwitch('000858')">五粮液</span><span class="quick-btn active" data-code="000333" onclick="quickSwitch('000333')">美的集团</span><span class="quick-btn active" data-code="600036" onclick="quickSwitch('600036')">招商银行</span><span class="quick-btn active" data-code="601318" onclick="quickSwitch('601318')">中国平安</span><span class="quick-btn active" data-code="000001" onclick="quickSwitch('000001')">平安银行</span><span class="quick-btn active" data-code="600887" onclick="quickSwitch('600887')">伊利股份</span><span class="quick-btn active" data-code="000568" onclick="quickSwitch('000568')">泸州老窖</span>
         </div>
 
         <!-- 左一右三图表视图 -->
@@ -171,6 +203,45 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             </div>
         </div>
 
+        <!-- 策略回测视图 -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('technical')">技术分析</button>
+            <button class="tab-btn" onclick="switchTab('strategy')">策略回测</button>
+        </div>
+
+        <div id="strategyView" class="strategy-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                    <span class="strategy-badge" id="strategyBadge">-</span>
+                    <span style="font-size: 12px; color: #64748b; margin-left: 8px;">最佳策略: <b id="bestStrategy">-</b></span>
+                </div>
+            </div>
+            <!-- 策略选择器 -->
+            <div class="strategy-selector" id="strategySelector">
+                <div class="selector-group">
+                    <span class="selector-label">动量:</span>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_momentum_1" checked onchange="updateStrategyChart()">231-21</label>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_momentum_2" onchange="updateStrategyChart()">189-63</label>
+                </div>
+                <div class="selector-group">
+                    <span class="selector-label">反转:</span>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_reversal_1" checked onchange="updateStrategyChart()">3日</label>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_reversal_2" onchange="updateStrategyChart()">5日</label>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_reversal_3" onchange="updateStrategyChart()">10日</label>
+                </div>
+                <div class="selector-group">
+                    <span class="selector-label">海龟:</span>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_turtle_1" checked onchange="updateStrategyChart()">20-10</label>
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_turtle_2" onchange="updateStrategyChart()">55-20</label>
+                </div>
+                <div class="selector-group">
+                    <label class="strategy-checkbox"><input type="checkbox" id="chk_benchmark" checked onchange="updateStrategyChart()">买入持有</label>
+                </div>
+            </div>
+            <div class="strategy-chart-container" id="strategyChart"></div>
+            <div class="strategy-grid" id="strategyGrid" style="margin-top: 12px;"></div>
+        </div>
+
         <!-- 榜单视图 -->
         <div id="rankingView" style="display:none; padding: 15px 25px;">
             <table class="rank-table">
@@ -183,6 +254,7 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                         <th>年化收益</th>
                         <th>最大回撤</th>
                         <th>量比</th>
+                        <th>策略适配</th>
                         <th>操作</th>
                     </tr>
                 </thead>
@@ -459,8 +531,9 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
 
         function quickSwitch(code) {
             currentStock = code;
-            document.querySelectorAll('.quick-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.textContent === code);
+            // 通过data-code属性匹配，而不是文本内容
+            document.querySelectorAll('.quick-btn[data-code]').forEach(btn => {
+                btn.classList.toggle('active', btn.getAttribute('data-code') === code);
             });
             updateDisplay();
         }
@@ -493,13 +566,34 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                 selector.innerHTML = '<span style="color:#888;font-size:10px;">无符合条件</span>';
             } else {
                 selector.innerHTML = filteredCodes.slice(0, 8).map(c =>
-                    '<span class="quick-btn' + (c === currentStock ? ' active' : '') + '" onclick="quickSwitch(\'' + c + '\')">' + (stockData[c] && stockData[c].name ? stockData[c].name : c) + '</span>'
+                    '<span class="quick-btn' + (c === currentStock ? ' active' : '') + '" data-code="' + c + '" onclick="quickSwitch(\'' + c + '\')">' + (stockData[c] && stockData[c].name ? stockData[c].name : c) + '</span>'
                 ).join('');
             }
 
             if (filteredCodes.length > 0 && !filteredCodes.includes(currentStock)) {
                 quickSwitch(filteredCodes[0]);
             } else if (filteredCodes.length === 0) {
+                updateDisplay();
+            }
+            renderRanking();
+        }
+
+        function resetFilter() {
+            document.getElementById('filterReturn').value = '0';
+            document.getElementById('filterDrawdown').value = '20';
+            document.getElementById('filterMA').checked = false;
+            document.getElementById('filterVolume').checked = false;
+            filteredCodes = allCodes;
+            document.getElementById('filterCount').textContent = '';
+
+            const selector = document.getElementById('quickSelector');
+            selector.innerHTML = filteredCodes.map(c => 
+                '<span class="quick-btn' + (c === currentStock ? ' active' : '') + '" data-code="' + c + '" onclick="quickSwitch(\'' + c + '\')">' + (stockData[c] && stockData[c].name ? stockData[c].name : c) + '</span>'
+            ).join('');
+
+            if (!allCodes.includes(currentStock)) {
+                quickSwitch(allCodes[0]);
+            } else {
                 updateDisplay();
             }
             renderRanking();
@@ -525,9 +619,23 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             document.getElementById('statDrawdown').textContent = stats.max_drawdown.toFixed(2) + '%';
             document.getElementById('statVolume').textContent = stats.volume_ratio.toFixed(2);
 
+            // 更新策略适配度
+            if (data.strategy) {
+                const adaptType = data.strategy.adapt_type;
+                const badge = document.getElementById('strategyBadge');
+                badge.textContent = adaptType;
+                const badgeClass = adaptType === '动量策略' ? 'momentum' : 
+                                   adaptType === '反转策略' ? 'reversal' : 
+                                   adaptType === '海龟策略' ? 'turtle' : 'neutral';
+                badge.className = 'strategy-badge ' + badgeClass;
+                document.getElementById('bestStrategy').textContent = data.strategy.best_strategy;
+                document.getElementById('statStrategy').textContent = adaptType.replace('策略', '');
+            }
+
             // 使用 requestAnimationFrame 确保容器尺寸正确
             requestAnimationFrame(() => {
                 renderCharts(data, startDate, endDate);
+                renderStrategyData(data);
             });
         }
 
@@ -575,9 +683,139 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             }
         }
 
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === (tab === 'technical' ? '技术分析' : '策略回测'));
+            });
+            document.getElementById('chartsView').style.display = tab === 'technical' ? 'flex' : 'none';
+            document.getElementById('strategyView').classList.toggle('active', tab === 'strategy');
+            if (tab === 'strategy') {
+                const data = stockData[currentStock];
+                if (data) renderStrategyData(data);
+            }
+        }
+
+        function getSelectedStrategies() {
+            return {
+                momentum: [
+                    document.getElementById('chk_momentum_1').checked,
+                    document.getElementById('chk_momentum_2').checked
+                ],
+                reversal: [
+                    document.getElementById('chk_reversal_1').checked,
+                    document.getElementById('chk_reversal_2').checked,
+                    document.getElementById('chk_reversal_3').checked
+                ],
+                turtle: [
+                    document.getElementById('chk_turtle_1').checked,
+                    document.getElementById('chk_turtle_2').checked
+                ],
+                benchmark: document.getElementById('chk_benchmark').checked
+            };
+        }
+
+        function updateStrategyChart() {
+            const data = stockData[currentStock];
+            if (!data || !data.strategy) return;
+            renderStrategyChart(data);
+        }
+
+        function renderStrategyData(data) {
+            if (!data.strategy) return;
+            renderStrategyChart(data);
+
+            // 渲染策略统计卡片
+            const grid = document.getElementById('strategyGrid');
+            let html = '';
+            const allStrategies = [...(data.strategy.momentum || []), ...(data.strategy.reversal || []), ...(data.strategy.turtle || [])];
+            allStrategies.forEach(s => {
+                const st = s.data.stats;
+                html += '<div class="strategy-card">';
+                html += '<h4>' + s.name + '</h4>';
+                html += '<div class="strategy-stats">';
+                html += '<div class="strategy-stat"><span class="label">年化收益</span><span class="value ' + (st.annual_return >= 0 ? 'positive' : 'negative') + '">' + (st.annual_return >= 0 ? '+' : '') + st.annual_return + '%</span></div>';
+                html += '<div class="strategy-stat"><span class="label">夏普比率</span><span class="value">' + st.sharpe_ratio + '</span></div>';
+                html += '<div class="strategy-stat"><span class="label">最大回撤</span><span class="value negative">' + st.max_drawdown + '%</span></div>';
+                html += '<div class="strategy-stat"><span class="label">日胜率</span><span class="value">' + st.win_rate + '%</span></div>';
+                html += '<div class="strategy-stat"><span class="label">总收益</span><span class="value ' + (st.total_return >= 0 ? 'positive' : 'negative') + '">' + (st.total_return >= 0 ? '+' : '') + st.total_return + '%</span></div>';
+                html += '<div class="strategy-stat"><span class="label">卡尔玛</span><span class="value">' + st.calmar_ratio + '</span></div>';
+                if (st.trades) html += '<div class="strategy-stat"><span class="label">交易次数</span><span class="value">' + st.trades + '</span></div>';
+                html += '</div></div>';
+            });
+            grid.innerHTML = html;
+        }
+
+        function renderStrategyChart(data) {
+            const container = document.getElementById('strategyChart');
+            if (!data.strategy_chart) {
+                container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">暂无策略数据</div>';
+                return;
+            }
+
+            const selected = getSelectedStrategies();
+            const originalData = data.strategy_chart.data;
+            const filteredTraces = [];
+
+            // 策略名称映射
+            const momentumNames = ['动量 231-21', '动量 189-63'];
+            const reversalNames = ['反转 3日', '反转 5日', '反转 10日'];
+            const turtleNames = ['海龟 20-10', '海龟 55-20'];
+
+            // 过滤动量策略
+            (data.strategy.momentum || []).forEach((item, i) => {
+                if (selected.momentum[i]) {
+                    const trace = originalData.find(t => t.name === item.name);
+                    if (trace) filteredTraces.push(trace);
+                }
+            });
+
+            // 过滤反转策略
+            (data.strategy.reversal || []).forEach((item, i) => {
+                if (selected.reversal[i]) {
+                    const trace = originalData.find(t => t.name === item.name);
+                    if (trace) filteredTraces.push(trace);
+                }
+            });
+
+            // 过滤海龟策略
+            (data.strategy.turtle || []).forEach((item, i) => {
+                if (selected.turtle[i]) {
+                    const trace = originalData.find(t => t.name === item.name);
+                    if (trace) filteredTraces.push(trace);
+                }
+            });
+
+            // 过滤基准
+            if (selected.benchmark) {
+                const trace = originalData.find(t => t.name === '买入持有');
+                if (trace) filteredTraces.push(trace);
+            }
+
+            if (filteredTraces.length === 0) {
+                container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">请选择要显示的策略</div>';
+                return;
+            }
+
+            const rect = container.getBoundingClientRect();
+            const layout = {
+                ...data.strategy_chart.layout,
+                autosize: false,
+                width: rect.width || container.offsetWidth || 800,
+                height: rect.height || container.offsetHeight || 320,
+                margin: {l: 50, r: 20, t: 30, b: 40},
+                showlegend: true,
+                legend: {orientation: 'h', y: 1.05, x: 0.5, xanchor: 'center', font: {size: 10}}
+            };
+
+            container.innerHTML = '<div id="strategy-plot"></div>';
+            Plotly.newPlot('strategy-plot', filteredTraces, layout, {responsive: false, displayModeBar: false});
+        }
+
         function showCharts() {
             currentView = 'charts';
-            document.getElementById('chartsView').style.display = 'flex';
+            const isStrategy = document.querySelector('.tab-btn.active') && document.querySelector('.tab-btn.active').textContent === '策略回测';
+            document.getElementById('chartsView').style.display = isStrategy ? 'none' : 'flex';
+            document.getElementById('strategyView').classList.toggle('active', isStrategy);
             document.getElementById('rankingView').style.display = 'none';
             document.querySelector('.btn-secondary').textContent = '📊 图表';
         }
@@ -585,6 +823,7 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
         function showRanking() {
             currentView = 'ranking';
             document.getElementById('chartsView').style.display = 'none';
+            document.getElementById('strategyView').classList.remove('active');
             document.getElementById('rankingView').style.display = 'block';
             document.querySelector('.btn-secondary').textContent = '📈 图表';
             renderRanking();
@@ -642,6 +881,12 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                 const returnSign = stats.return >= 0 ? '+' : '';
                 const annualized = (stats.return * 252 / stockData[code].days).toFixed(2);
                 const stockName = stockData[code] && stockData[code].name ? stockData[code].name : code;
+                const strategyInfo = stockData[code] && stockData[code].strategy ? stockData[code].strategy : {};
+                const adaptType = strategyInfo.adapt_type || '-';
+                const adaptBadge = adaptType === '动量策略' ? '<span class="strategy-badge momentum">动量</span>' :
+                                   adaptType === '反转策略' ? '<span class="strategy-badge reversal">反转</span>' :
+                                   adaptType === '海龟策略' ? '<span class="strategy-badge turtle">海龟</span>' :
+                                   '<span class="strategy-badge neutral">-</span>';
                 return '<tr>' +
                     '<td>' + rank + '</td>' +
                     '<td class="code">' + code + '</td>' +
@@ -650,6 +895,7 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                     '<td>' + annualized + '%</td>' +
                     '<td>' + stats.max_drawdown.toFixed(2) + '%</td>' +
                     '<td>' + stats.volume_ratio.toFixed(2) + '</td>' +
+                    '<td>' + adaptBadge + '</td>' +
                     '<td><button class="quick-btn" onclick="quickSwitch(\'' + code + '\'); showCharts();">查看</button></td>' +
                 '</tr>';
             }).join('');
