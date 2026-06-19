@@ -15,6 +15,10 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
 .btn-primary:hover { background: #1e3a5f; }
 .btn-secondary { background: #e2e8f0; color: #4a5568; }
 .btn-secondary:hover { background: #cbd5e0; }
+.view-toggle { display: flex; background: #e2e8f0; border-radius: 6px; padding: 2px; }
+.view-btn { border: none; background: transparent; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; color: #64748b; font-weight: 500; transition: all 0.2s; }
+.view-btn:hover { background: rgba(255,255,255,0.5); color: #2c5282; }
+.view-btn.active { background: white; color: #2c5282; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px; background: white; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 10px; }
 .toolbar-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .toolbar-right { display: flex; gap: 10px; align-items: center; }
@@ -94,6 +98,9 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
 .tab-btn { padding: 8px 16px; border: none; background: none; cursor: pointer; font-size: 12px; color: #64748b; font-weight: 500; border-bottom: 2px solid transparent; }
 .tab-btn:hover { color: #2c5282; }
 .tab-btn.active { color: #2c5282; border-bottom-color: #2c5282; }
+.view-container { position: relative; }
+.ranking-section { display: none; padding: 15px 25px; }
+.ranking-section.active { display: block; }
 </style>
 </head>
 <body>
@@ -103,8 +110,10 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             <div class="header-controls">
                 <input type="date" class="date-input" id="startDate" value="1969-07-01" onchange="filterByDate()">
                 <input type="date" class="date-input" id="endDate" value="1970-01-01" onchange="filterByDate()">
-                <button class="btn btn-primary" onclick="showRanking()">📋榜单</button>
-                <button class="btn btn-secondary" onclick="showCharts()">📊图表</button>
+                <div class="view-toggle">
+                    <button class="view-btn active" id="btnCharts" onclick="showCharts()">📊图表</button>
+                    <button class="view-btn" id="btnRanking" onclick="showRanking()">📋榜单</button>
+                </div>
                 <div class="period-selector">
                     <button class="period-btn active" onclick="switchPeriod('d')">日线</button>
                     <button class="period-btn" onclick="switchPeriod('w')">周线</button>
@@ -165,51 +174,54 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             <span class="quick-btn active" data-code="600519" onclick="quickSwitch('600519')">贵州茅台</span><span class="quick-btn active" data-code="000858" onclick="quickSwitch('000858')">五粮液</span><span class="quick-btn active" data-code="000333" onclick="quickSwitch('000333')">美的集团</span><span class="quick-btn active" data-code="600036" onclick="quickSwitch('600036')">招商银行</span><span class="quick-btn active" data-code="601318" onclick="quickSwitch('601318')">中国平安</span><span class="quick-btn active" data-code="000001" onclick="quickSwitch('000001')">平安银行</span><span class="quick-btn active" data-code="600887" onclick="quickSwitch('600887')">伊利股份</span><span class="quick-btn active" data-code="000568" onclick="quickSwitch('000568')">泸州老窖</span>
         </div>
 
-        <!-- 左一右三图表视图 -->
-        <div class="charts-container" id="chartsView">
-            <!-- 左侧大图：均线 -->
-            <div class="left-panel">
-                <div class="grid-cell" onclick="expandChart('chart1')">
-                    <div class="cell-header">
-                        <span class="cell-title">K线+均线+成交量</span>
-                        <span class="expand-hint">↗ 点击展开</span>
-                    </div>
-                    <div class="cell-body" id="chart1"></div>
-                </div>
-            </div>
-            <!-- 右侧三个小图 -->
-            <div class="right-panel">
-                <div class="grid-cell" onclick="expandChart('chart2')">
-                    <div class="cell-header">
-                        <span class="cell-title">净值</span>
-                        <span class="expand-hint">↗ 点击展开</span>
-                    </div>
-                    <div class="cell-body" id="chart2"></div>
-                </div>
-                <div class="grid-cell" onclick="expandChart('chart3')">
-                    <div class="cell-header">
-                        <span class="cell-title">回撤分析</span>
-                        <span class="expand-hint">↗ 点击展开</span>
-                    </div>
-                    <div class="cell-body" id="chart3"></div>
-                </div>
-                <div class="grid-cell" onclick="expandChart('chart4')">
-                    <div class="cell-header">
-                        <span class="cell-title">波动率</span>
-                        <span class="expand-hint">↗ 点击展开</span>
-                    </div>
-                    <div class="cell-body" id="chart4"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 策略回测视图 -->
+        <!-- Tab切换栏 -->
         <div class="tab-bar">
             <button class="tab-btn active" onclick="switchTab('technical')">技术分析</button>
             <button class="tab-btn" onclick="switchTab('strategy')">策略回测</button>
         </div>
 
-        <div id="strategyView" class="strategy-section">
+        <!-- 视图容器：技术分析、策略回测、榜单共享同一空间 -->
+        <div class="view-container">
+            <!-- 左一右三图表视图 -->
+            <div class="charts-container" id="chartsView">
+                <!-- 左侧大图：均线 -->
+                <div class="left-panel">
+                    <div class="grid-cell" onclick="expandChart('chart1')">
+                        <div class="cell-header">
+                            <span class="cell-title">K线+均线+成交量</span>
+                            <span class="expand-hint">↗ 点击展开</span>
+                        </div>
+                        <div class="cell-body" id="chart1"></div>
+                    </div>
+                </div>
+                <!-- 右侧三个小图 -->
+                <div class="right-panel">
+                    <div class="grid-cell" onclick="expandChart('chart2')">
+                        <div class="cell-header">
+                            <span class="cell-title">净值</span>
+                            <span class="expand-hint">↗ 点击展开</span>
+                        </div>
+                        <div class="cell-body" id="chart2"></div>
+                    </div>
+                    <div class="grid-cell" onclick="expandChart('chart3')">
+                        <div class="cell-header">
+                            <span class="cell-title">回撤分析</span>
+                            <span class="expand-hint">↗ 点击展开</span>
+                        </div>
+                        <div class="cell-body" id="chart3"></div>
+                    </div>
+                    <div class="grid-cell" onclick="expandChart('chart4')">
+                        <div class="cell-header">
+                            <span class="cell-title">波动率</span>
+                            <span class="expand-hint">↗ 点击展开</span>
+                        </div>
+                        <div class="cell-body" id="chart4"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 策略回测视图 -->
+            <div id="strategyView" class="strategy-section">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <div>
                     <span class="strategy-badge" id="strategyBadge">-</span>
@@ -240,11 +252,11 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             </div>
             <div class="strategy-chart-container" id="strategyChart"></div>
             <div class="strategy-grid" id="strategyGrid" style="margin-top: 12px;"></div>
-        </div>
+            </div>
 
-        <!-- 榜单视图 -->
-        <div id="rankingView" style="display:none; padding: 15px 25px;">
-            <table class="rank-table">
+            <!-- 榜单视图 -->
+            <div id="rankingView" class="ranking-section">
+                <table class="rank-table">
                 <thead>
                     <tr>
                         <th class="rank">#</th>
@@ -261,6 +273,7 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                 <tbody id="rankBody">
                 </tbody>
             </table>
+            </div>
         </div>
 
         <!-- 图表全屏模态框 -->
@@ -816,16 +829,18 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             const isStrategy = document.querySelector('.tab-btn.active') && document.querySelector('.tab-btn.active').textContent === '策略回测';
             document.getElementById('chartsView').style.display = isStrategy ? 'none' : 'flex';
             document.getElementById('strategyView').classList.toggle('active', isStrategy);
-            document.getElementById('rankingView').style.display = 'none';
-            document.querySelector('.btn-secondary').textContent = '📊 图表';
+            document.getElementById('rankingView').classList.remove('active');
+            document.getElementById('btnCharts').classList.add('active');
+            document.getElementById('btnRanking').classList.remove('active');
         }
 
         function showRanking() {
             currentView = 'ranking';
             document.getElementById('chartsView').style.display = 'none';
             document.getElementById('strategyView').classList.remove('active');
-            document.getElementById('rankingView').style.display = 'block';
-            document.querySelector('.btn-secondary').textContent = '📈 图表';
+            document.getElementById('rankingView').classList.add('active');
+            document.getElementById('btnCharts').classList.remove('active');
+            document.getElementById('btnRanking').classList.add('active');
             renderRanking();
         }
 
