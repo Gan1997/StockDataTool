@@ -88,7 +88,7 @@ class DataCleaner:
             return df
 
         before = len(df)
-        df = df.drop_duplicates(subset=['date'], keep='first')
+        df = df.drop_duplicates(subset=['date'], keep='last')
         removed = before - len(df)
 
         if removed > 0:
