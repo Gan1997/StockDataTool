@@ -655,21 +655,19 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
         function renderCharts(data, startDate, endDate) {
             try {
                 const periodKey = currentPeriod === 'd' ? '_d' : currentPeriod === 'w' ? '_w' : '_m';
-                ['chart1', 'chart2', 'chart3', 'chart4'].forEach(id => {
+                const chartIds = ['chart1', 'chart2', 'chart3', 'chart4'];
+                
+                chartIds.forEach(id => {
                     const keyMap = {'chart1': 'ma', 'chart2': 'returns', 'chart3': 'drawdown', 'chart4': 'volatility'};
                     const key = keyMap[id] + periodKey;
-                    console.log('Rendering chart', id, 'with key', key, 'data[key]:', data[key]);
                     const container = document.getElementById(id);
                     if (data[key]) {
                         const fig = data[key];
-                        console.log('fig.data:', fig.data, 'fig.layout:', fig.layout);
 
-                        // 获取容器实际尺寸
                         const containerRect = container.getBoundingClientRect();
                         let containerWidth = containerRect.width;
                         let containerHeight = containerRect.height;
 
-                        // 如果容器尺寸为0，使用默认值
                         if (containerWidth === 0) containerWidth = id === 'chart1' ? 700 : 400;
                         if (containerHeight === 0) containerHeight = id === 'chart1' ? 500 : 200;
 
@@ -685,12 +683,52 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                         }
                         container.innerHTML = '<div id="' + id + '-plot"></div>';
                         Plotly.newPlot(id + '-plot', fig.data, layout, {responsive: false, displayModeBar: false});
-                        console.log('Chart', id, 'rendered successfully with size', containerWidth, 'x', containerHeight);
                     } else {
                         container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">暂无数据</div>';
-                        console.log('No data for chart', id);
                     }
                 });
+
+                setTimeout(() => {
+                    chartIds.forEach(sourceId => {
+                        const sourcePlot = document.getElementById(sourceId + '-plot');
+                        if (!sourcePlot || !sourcePlot.data) return;
+
+                        sourcePlot.on('hover', function(data) {
+                            const pointIndex = data.points && data.points.length > 0 ? data.points[0].pointIndex : null;
+                            if (pointIndex === null) {
+                                chartIds.forEach(targetId => {
+                                    const targetPlot = document.getElementById(targetId + '-plot');
+                                    if (targetPlot && targetPlot !== sourcePlot) {
+                                        Plotly.hover(targetPlot, {points: []});
+                                    }
+                                });
+                                return;
+                            }
+
+                            chartIds.forEach(targetId => {
+                                const targetPlot = document.getElementById(targetId + '-plot');
+                                if (targetPlot && targetPlot !== sourcePlot) {
+                                    Plotly.hover(targetPlot, {points: [[0, pointIndex]]});
+                                }
+                            });
+                        });
+
+                        sourcePlot.on('relayout', function(eventData) {
+                            if (eventData['xaxis.range[0]'] !== undefined && eventData['xaxis.range[1]'] !== undefined) {
+                                const newRange = [eventData['xaxis.range[0]'], eventData['xaxis.range[1]']];
+                                chartIds.forEach(targetId => {
+                                    const targetPlot = document.getElementById(targetId + '-plot');
+                                    if (targetPlot && targetPlot !== sourcePlot) {
+                                        Plotly.relayout(targetPlot, {
+                                            'xaxis.range[0]': newRange[0],
+                                            'xaxis.range[1]': newRange[1]
+                                        });
+                                    }
+                                });
+                            }
+                        });
+                    });
+                }, 500);
             } catch (e) {
                 console.error('Error rendering charts:', e);
             }
@@ -743,6 +781,10 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
             const allStrategies = [...(data.strategy.momentum || []), ...(data.strategy.reversal || []), ...(data.strategy.turtle || [])];
             allStrategies.forEach(s => {
                 const st = s.data.stats;
+                const buyCount = st.buy_count || 0;
+                const sellCount = st.sell_count || 0;
+                const tradeCount = st.trade_count || (buyCount + sellCount);
+                const turnoverRate = st.turnover_rate || 0;
                 html += '<div class="strategy-card">';
                 html += '<h4>' + s.name + '</h4>';
                 html += '<div class="strategy-stats">';
@@ -752,7 +794,9 @@ body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; background: 
                 html += '<div class="strategy-stat"><span class="label">日胜率</span><span class="value">' + st.win_rate + '%</span></div>';
                 html += '<div class="strategy-stat"><span class="label">总收益</span><span class="value ' + (st.total_return >= 0 ? 'positive' : 'negative') + '">' + (st.total_return >= 0 ? '+' : '') + st.total_return + '%</span></div>';
                 html += '<div class="strategy-stat"><span class="label">卡尔玛</span><span class="value">' + st.calmar_ratio + '</span></div>';
-                if (st.trades) html += '<div class="strategy-stat"><span class="label">交易次数</span><span class="value">' + st.trades + '</span></div>';
+                html += '<div class="strategy-stat"><span class="label">买入/卖出</span><span class="value">' + buyCount + ' / ' + sellCount + '</span></div>';
+                html += '<div class="strategy-stat"><span class="label">交易笔数</span><span class="value">' + tradeCount + '</span></div>';
+                html += '<div class="strategy-stat"><span class="label">换手率</span><span class="value">' + turnoverRate + '%</span></div>';
                 html += '</div></div>';
             });
             grid.innerHTML = html;

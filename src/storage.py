@@ -146,6 +146,19 @@ class MongoStorage:
         logger.info(f"存储完成: {inserted_count} 条记录")
         return inserted_count
 
+    def _normalize_code(self, stock_code: str) -> str:
+        """标准化股票代码，添加交易所前缀"""
+        if not stock_code:
+            return stock_code
+        stock_code = stock_code.strip()
+        if "." in stock_code:
+            return stock_code.lower()
+        if stock_code.startswith("6"):
+            return f"sh.{stock_code}"
+        elif stock_code.startswith(("0", "3")):
+            return f"sz.{stock_code}"
+        return stock_code
+
     def load(
         self,
         stock_code: str = None,
@@ -175,7 +188,7 @@ class MongoStorage:
         query = {}
 
         if stock_code:
-            query['code'] = stock_code
+            query['code'] = self._normalize_code(stock_code)
 
         if start_date or end_date:
             query['date'] = {}
@@ -225,7 +238,7 @@ class MongoStorage:
             if not self.connect():
                 return False
 
-        query = {'code': stock_code}
+        query = {'code': self._normalize_code(stock_code)}
 
         if start_date and end_date:
             query['date'] = {'$gte': start_date, '$lte': end_date}
@@ -256,7 +269,7 @@ class MongoStorage:
         query = {}
 
         if stock_code:
-            query['code'] = stock_code
+            query['code'] = self._normalize_code(stock_code)
 
         if start_date or end_date:
             query['date'] = {}

@@ -95,7 +95,7 @@ class StockFetcher:
 
     def _check_db_exists(self, stock_code: str, start_date: str, end_date: str) -> Optional[pd.DataFrame]:
         """
-        检查数据库中是否已有该股票指定区间的数据
+        检查数据库中是否已有该股票指定区间的完整数据
 
         Args:
             stock_code: 股票代码
@@ -103,7 +103,7 @@ class StockFetcher:
             end_date: 结束日期
 
         Returns:
-            如果数据存在则返回DataFrame，否则返回None
+            如果数据完整存在则返回DataFrame，否则返回None
         """
         if not self.use_db:
             return None
@@ -113,14 +113,24 @@ class StockFetcher:
             if storage is None:
                 return None
 
-            # 检查数据库中是否有该区间的数据
             df = storage.load(stock_code, start_date, end_date)
-            if not df.empty:
-                # 检查数据日期范围是否覆盖请求的区间
-                db_min_date = df['date'].min()
-                db_max_date = df['date'].max()
+            if df.empty:
+                return None
+
+            db_min_date = df['date'].min()
+            db_max_date = df['date'].max()
+            
+            req_start_date = pd.to_datetime(start_date)
+            req_end_date = pd.to_datetime(end_date)
+            
+            margin_days = pd.Timedelta(days=5)
+            
+            if db_min_date <= req_start_date + margin_days and db_max_date >= req_end_date:
                 logger.info(f"数据库已有: {stock_code} ({db_min_date.date()} ~ {db_max_date.date()})")
                 return df
+            else:
+                logger.info(f"数据库数据不完整: {stock_code} 数据库({db_min_date.date()} ~ {db_max_date.date()}) < 请求({start_date} ~ {end_date})")
+                return None
         except Exception as e:
             logger.warning(f"数据库检查失败: {e}")
 

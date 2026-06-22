@@ -95,6 +95,14 @@ class StrategyBacktest:
         # 计算统计指标
         stats = self._calc_stats(strategy_ret, equity)
 
+        # 统计买卖交易笔数
+        signal_shifted = signal.shift(1).fillna(0)
+        buy_count = int((signal_shifted.diff().fillna(0) == 1).sum())
+        sell_count = int((signal_shifted.diff().fillna(0) == -1).sum())
+        stats['buy_count'] = buy_count
+        stats['sell_count'] = sell_count
+        stats['trade_count'] = buy_count + sell_count
+
         return {
             'dates': equity.index.strftime('%Y-%m-%d').tolist(),
             'equity': equity.values.tolist(),
@@ -138,6 +146,14 @@ class StrategyBacktest:
 
         # 计算统计指标
         stats = self._calc_stats(strategy_ret, equity)
+
+        # 统计买卖交易笔数
+        signal_shifted = signal.shift(1).fillna(0)
+        buy_count = int((signal_shifted.diff().fillna(0) == 1).sum())
+        sell_count = int((signal_shifted.diff().fillna(0) == -1).sum())
+        stats['buy_count'] = buy_count
+        stats['sell_count'] = sell_count
+        stats['trade_count'] = buy_count + sell_count
 
         return {
             'dates': equity.index.strftime('%Y-%m-%d').tolist(),
@@ -208,9 +224,14 @@ class StrategyBacktest:
         # 计算统计指标
         stats = self._calc_stats(strategy_ret, equity)
 
-        # 计算交易次数
-        trades = (signal.diff().fillna(0) == 1).sum()
-        stats['trades'] = int(trades)
+        # 统计买卖交易笔数
+        signal_shifted = signal.shift(1).fillna(0)
+        buy_count = int((signal_shifted.diff().fillna(0) == 1).sum())
+        sell_count = int((signal_shifted.diff().fillna(0) == -1).sum())
+        stats['buy_count'] = buy_count
+        stats['sell_count'] = sell_count
+        stats['trade_count'] = buy_count + sell_count
+        stats['trades'] = buy_count  # 兼容旧字段
 
         return {
             'dates': equity.index.strftime('%Y-%m-%d').tolist(),
