@@ -386,11 +386,31 @@ def parse_args():
     return parser.parse_args()
 
 
+def print_report_links(output_dir):
+    """打印生成的报告链接"""
+    output_dir = Path(output_dir)
+    html_files = list(output_dir.glob("*.html"))
+
+    if html_files:
+        print("\n📊 生成的报告文件:")
+        print("=" * 60)
+        for html_file in html_files:
+            file_path = str(html_file).replace("\\", "/")
+            print(f"  - {html_file.name}")
+            print(f"    本地路径: file:///{file_path}")
+            print(f"    浏览器访问: http://localhost:8080/{html_file.name}")
+        print("=" * 60)
+        print(f"\n💡 提示: 在 {output_dir} 目录下启动HTTP服务器:")
+        print(f"    cd {output_dir}")
+        print(f"    python -m http.server 8080")
+
+
 def main():
     """主入口"""
     args = parse_args()
 
     pipeline = StockPipeline()
+    output_dir = Path(config.PLOT_CONFIG["output_dir"])
 
     if args.screen:
         # 选股模式
@@ -403,7 +423,6 @@ def main():
         # 绘制选股结果
         if results:
             plotter = StockPlotter()
-            output_dir = Path(config.PLOT_CONFIG["output_dir"])
             plotter.plot_screening_result(results, output_dir / "screening_result.html")
 
     elif args.mode == "batch" or args.stock is None:
@@ -426,6 +445,8 @@ def main():
             end_date=args.end,
             period=args.period
         )
+
+    print_report_links(output_dir)
 
 
 if __name__ == "__main__":
