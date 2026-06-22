@@ -228,7 +228,7 @@ class StockFetcher:
             Dict[stock_code, DataFrame]
         """
         if stock_codes is None:
-            stock_codes = STOCK_CONFIG["stock_list"]
+            stock_codes = list(STOCK_CONFIG["stock_list"].keys())
 
         if start_date is None:
             start_date = STOCK_CONFIG["start_date"]

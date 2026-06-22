@@ -61,7 +61,7 @@ class StockPipeline:
         Returns:
             运行结果字典
         """
-        stock_code = stock_code or config.STOCK_CONFIG["stock_code"]
+        stock_code = stock_code or next(iter(config.STOCK_CONFIG["stock_list"].keys()), "600519")
         start_date = start_date or config.STOCK_CONFIG["start_date"]
         end_date = end_date or config.STOCK_CONFIG["end_date"]
 
@@ -181,7 +181,7 @@ class StockPipeline:
             Dict[stock_code, result]
         """
         if stock_codes is None:
-            stock_codes = config.STOCK_CONFIG["stock_list"]
+            stock_codes = list(config.STOCK_CONFIG["stock_list"].keys())
 
         logger.info(f"=" * 50)
         logger.info(f"批量处理: {len(stock_codes)} 只股票")
@@ -253,7 +253,7 @@ class StockPipeline:
             符合条件的股票列表
         """
         if stock_codes is None:
-            stock_codes = config.STOCK_CONFIG["stock_list"]
+            stock_codes = list(config.STOCK_CONFIG["stock_list"].keys())
 
         if criteria is None:
             criteria = {

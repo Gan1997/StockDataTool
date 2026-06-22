@@ -12,23 +12,11 @@ from pathlib import Path
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from config import PLOT_CONFIG
+from config import PLOT_CONFIG, STOCK_CONFIG
 from src.logger import get_logger
 from src.strategy_backtest import StrategyBacktest
 
 logger = get_logger("Plotter")
-
-# 股票代码到名称的映射
-STOCK_NAME_MAP = {
-    "600519": "贵州茅台",
-    "000858": "五粮液",
-    "000333": "美的集团",
-    "600036": "招商银行",
-    "601318": "中国平安",
-    "000001": "平安银行",
-    "600887": "伊利股份",
-    "000568": "泸州老窖",
-}
 
 
 class StockPlotter:
@@ -1127,7 +1115,7 @@ class StockPlotter:
                 'raw_w': raw_data_w,
                 'raw_m': raw_data_m,
                 'days': len(df),
-                'name': STOCK_NAME_MAP.get(code, code),
+                'name': STOCK_CONFIG['stock_list'].get(code, code),
                 'strategy': strategy_eval,
                 'strategy_chart': self._fig_to_json(strategy_chart) if strategy_chart else None,
             }
